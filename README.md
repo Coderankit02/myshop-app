@@ -119,35 +119,35 @@ eas build --profile production --platform android # → Play Store AAB (signed)
 
 ## 🔔 Push Notifications (FCM setup — production ke liye zaroori)
 
-> App me Android notification **small-icon** pehle se configured hai
-> (`app.json` → `expo-notifications` plugin → `icon`), aur `default` channel
-> `usePush.ts` me banaya jata hai — sirf `google-services.json` aur FCM key
-> upload karna baki hai (niche steps).
+> ✅ **Ho chuka (2026-08-10):** `app.json` → `expo-notifications` plugin me
+> `googleServicesFile: "./google-services.json"` configured hai; `usePush.ts`
+> device token ko Supabase `device_tokens` table me save karta hai
+> (migration: `myshopadmin/supabase/fcm-device-tokens-migration.sql` —
+> production par applied ✓). Sirf Firebase console wale steps baki hain (niche).
 
 Expo push Android production builds ke liye **Firebase Cloud Messaging (FCM)** chahiye:
 
 1. https://console.firebase.google.com → project banao → **Add Android app**
    (package: `com.rinkukiranastore.app`) → `google-services.json` download karo
-   aur **project root me rakh do**.
-2. `app.json` me `android.googleServicesFile` add karo:
-   ```json
-   "android": {
-     "package": "com.rinkukiranastore.app",
-     "googleServicesFile": "./google-services.json"
-   }
-   ```
-3. Re-build (EAS). Firebase → Project Settings → **Service Accounts** → Generate
-   new private key → `eas credentials` me Android **FCM V1** key upload karo
-   (ya EAS ko auto-handle karne do).
+   aur **project root me rakh do** (`myshop-app/google-services.json` —
+   gitignored hai, build se pehle locally present hona chahiye).
+2. EAS se rebuild (`eas build --profile production --platform android`).
+   Config plugin `google-services.json` ko apne aap Android project me copy
+   karega — alag se kuch nahi karna.
+3. Firebase → Project Settings → **Service Accounts** → **Generate new private
+   key** (JSON) → `eas credentials` → Android → **FCM V1** key upload karo
+   (ya `eas build` ke time EAS ko prompt karke de do).
 4. App already `expo-notifications` se device token register karti hai
-   (`src/hooks/usePush.ts`) — token `AsyncStorage` me save hota hai.
+   (`src/hooks/usePush.ts`) — token AsyncStorage + `device_tokens` table dono
+   me save hota hai (user_id ke saath, RLS-secured).
 
-**Server se send karna** (order status alerts ke liye — website ke `orderAlerts.js`
-jaisa, sirf Expo Push API se):
+**Server se send karna** (order status alerts ke liye — website ke
+`orderAlerts.js` jaisa, sirf Expo Push API se):
 
 ```js
 const { Expo } = require('expo-server-sdk');
 const expo = new Expo();
+// device_tokens table se user ke saare tokens lo (admin role)
 await expo.sendPushNotificationsAsync([
   {
     to: 'ExponentPushToken[xxxx]',
@@ -158,9 +158,10 @@ await expo.sendPushNotificationsAsync([
 ]);
 ```
 
-> Edge function / cron se admin ke order-update action par ye call karo. Device
-> tokens ko ek `push_tokens` table me save karna ho to pehle DB schema dekhna
-> (AGENTS.md rule: kabhi guess mat karo, pehle inspect).
+> Device tokens `public.device_tokens` (user_id, token, platform) mein hain —
+> admin `is_admin_write` role se sab padh sakta hai, user sirf apna.
+> Production push ke liye `EXPO_ACCESS_TOKEN` (Expo dashboard) se `expo`
+> ke paas `accessToken` dena better hai.
 
 ---
 

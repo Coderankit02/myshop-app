@@ -50,7 +50,8 @@
         {
           "color": "#15803D",
           "defaultChannel": "default",
-          "icon": "./assets/images/notification-icon.png"
+          "icon": "./assets/images/notification-icon.png",
+          "googleServicesFile": "./google-services.json"
         }
       ],
       "expo-image-picker",
