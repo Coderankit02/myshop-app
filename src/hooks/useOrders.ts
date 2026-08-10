@@ -14,6 +14,7 @@ export interface CreateOrderOpts {
   paymentMethod: string;
   promoCode?: string | null;
   discount?: number;
+  rewardsPoints?: number;
   latitude?: number | null;
   longitude?: number | null;
   distance_km?: number | null;
@@ -81,7 +82,11 @@ async function decrementStock(cartItems: CartItem[]) {
 
 /** Legacy direct-insert path (used only when create_order RPC is missing) */
 async function legacyCreateOrder(userId: string | null, opts: CreateOrderOpts): Promise<CreateOrderResult | null> {
-  const { cart, total, address, paymentMethod, promoCode = null, discount = 0 } = opts;
+  const { cart, total, address, paymentMethod, promoCode = null, discount = 0, rewardsPoints = 0 } = opts;
+  const rewardsDiscount = Math.floor(rewardsPoints / 10); // 100 pts = ₹10
+  // NOTE: legacy path sirf tab chalta hai jab create_order RPC DB me na ho.
+  // Is path mein reward_redemptions ledger nahi banta (RPC ke andar banta hai) —
+  // production me RPC hamesha hai, isliye points reuse possible nahi.
   const orderNumber = genOrderNumber();
   const locationFields =
     opts.latitude != null
@@ -96,7 +101,7 @@ async function legacyCreateOrder(userId: string | null, opts: CreateOrderOpts): 
           location_accuracy: opts.location_accuracy ?? null,
         }
       : { delivery_charge: 0, delivery_status: 'unknown' };
-  const finalAmount = Math.max(0, total - discount + (locationFields.delivery_charge || 0));
+  const finalAmount = Math.max(0, total - discount - rewardsDiscount + (locationFields.delivery_charge || 0));
 
   const { data: order, error: oErr } = await supabase
     .from('orders')
@@ -107,9 +112,11 @@ async function legacyCreateOrder(userId: string | null, opts: CreateOrderOpts): 
       payment_method: paymentMethod,
       payment_status: 'pending',
       subtotal: total,
-      discount,
+      discount: discount + rewardsDiscount,
       promo_code: promoCode,
       final_amount: finalAmount,
+      rewards_points: rewardsPoints,
+      rewards_discount: rewardsDiscount,
       delivery_name: address.name,
       delivery_phone: address.phone,
       delivery_line1: address.line1,
@@ -175,6 +182,7 @@ export async function createOrder(userId: string | null, opts: CreateOrderOpts):
       p_maps_link: opts.maps_link || null,
       p_maps_nav_link: opts.maps_nav_link || null,
       p_location_accuracy: opts.location_accuracy ?? null,
+      p_rewards_points: opts.rewardsPoints || 0,
     });
 
     if (error) {

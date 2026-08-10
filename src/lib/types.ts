@@ -149,6 +149,8 @@ export interface Order {
   subtotal: number;
   discount: number;
   promo_code?: string | null;
+  rewards_points?: number;
+  rewards_discount?: number;
   delivery_charge: number;
   final_amount: number;
   delivery_name?: string | null;

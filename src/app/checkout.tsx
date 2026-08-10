@@ -73,9 +73,34 @@ export default function CheckoutScreen() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
   const [couponError, setCouponError] = useState('');
-  const discount = appliedCoupon?.discount || 0;
+  // Reward points redeem — 100 pts = ₹10 (server-side create_order RPC validate karta hai)
+  const [rewardBalance, setRewardBalance] = useState(0);
+  const [rewardApplied, setRewardApplied] = useState(0);
+  const couponDiscount = appliedCoupon?.discount || 0;
+  const rewardDiscount = Math.floor(rewardApplied / 10); // 100 pts = ₹10
+  const discount = couponDiscount + rewardDiscount;
+  // Is order par max kitne points use ho sakte hain (subtotal − coupon tak) —
+  // server bhi yahi cap karta hai, taaki chhote order par saare points na burn hon.
+  const maxRewardPts = Math.min(rewardBalance, Math.max(0, Math.floor((total - couponDiscount) * 10)));
   const deliveryCharge = deliveryInfo && deliveryInfo.available ? deliveryInfo.charge : 0;
   const finalAmount = Math.max(0, total - discount + deliveryCharge);
+
+  // Fetch redeemable points balance (server-computed: delivered×10 − redeemed)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!user) {
+        setRewardBalance(0);
+        setRewardApplied(0);
+        return;
+      }
+      const { data } = await supabase.rpc('get_redeemable_points', { p_user_id: user.id });
+      if (active) setRewardBalance(Number(data) || 0);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   // UPI verify phase — order UPI verification par hi create hota hai (site jaisa)
   const [phase, setPhase] = useState<'form' | 'upiVerify' | 'success'>('form');
@@ -230,6 +255,7 @@ export default function CheckoutScreen() {
     paymentMethod,
     promoCode: appliedCoupon?.code || null,
     discount,
+    rewardsPoints: rewardApplied,
     ...(deliveryInfo && gpsPos
       ? {
           latitude: gpsPos.lat,
@@ -633,10 +659,61 @@ export default function CheckoutScreen() {
               </AppText>
             ) : null}
 
+            {/* Reward points redeem */}
+            {user && maxRewardPts >= 100 && (
+              <View>
+                <View style={[styles.divider, { borderTopColor: theme.border }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <AppText variant="captionBold" color={theme.gray} style={{ textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                    ⭐ Reward Points
+                  </AppText>
+                  <AppText variant="captionBold" style={{ color: theme.tintYellow.text }}>
+                    {maxRewardPts} pts = {inr(Math.floor(maxRewardPts / 10))}
+                  </AppText>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable
+                    onPress={() => setRewardApplied((a) => Math.max(0, a - 100))}
+                    disabled={rewardApplied <= 0}
+                    style={[styles.rewardBtn, { backgroundColor: theme.light, borderColor: theme.border }]}
+                    hitSlop={6}>
+                    <AppText variant="heading" color={theme.primaryDark}>
+                      −
+                    </AppText>
+                  </Pressable>
+                  <View style={[styles.rewardApplied, { backgroundColor: theme.light }]}>
+                    <AppText variant="captionBold">
+                      {rewardApplied > 0 ? `${rewardApplied} pts (−${inr(rewardDiscount)})` : 'Apply points karo'}
+                    </AppText>
+                  </View>
+                  <Pressable
+                    onPress={() => setRewardApplied((a) => Math.min(maxRewardPts, a + 100))}
+                    disabled={rewardApplied + 100 > maxRewardPts}
+                    style={[styles.rewardBtn, { backgroundColor: theme.light, borderColor: theme.border }]}
+                    hitSlop={6}>
+                    <AppText variant="heading" color={theme.primaryDark}>
+                      +
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setRewardApplied(rewardApplied > 0 ? 0 : Math.floor(maxRewardPts / 100) * 100)}
+                    style={[styles.rewardAll, { backgroundColor: theme.tintYellow.bg, borderColor: theme.tintYellow.border }]}>
+                    <AppText variant="captionBold" style={{ color: theme.tintYellow.text }}>
+                      {rewardApplied > 0 ? 'Clear' : 'Apply All'}
+                    </AppText>
+                  </Pressable>
+                </View>
+                <AppText variant="tiny" color={theme.muted} style={{ marginTop: 6 }}>
+                  100 points = ₹10 discount • Is order par max {maxRewardPts} pts use ho sakte hain
+                </AppText>
+              </View>
+            )}
+
             {/* Totals */}
             <View style={[styles.divider, { borderTopColor: theme.border }]} />
             <BillRow label="Subtotal" value={inr(total)} theme={theme} />
-            {discount > 0 && <BillRow label="Coupon Discount" value={`−${inr(discount)}`} color={theme.primary} theme={theme} />}
+            {couponDiscount > 0 && <BillRow label="Coupon Discount" value={`−${inr(couponDiscount)}`} color={theme.primary} theme={theme} />}
+            {rewardDiscount > 0 && <BillRow label="⭐ Reward Discount" value={`−${inr(rewardDiscount)}`} color={theme.tintYellow.text} theme={theme} />}
             {deliveryCharge > 0 && <BillRow label="Delivery Charge" value={inr(deliveryCharge)} theme={theme} />}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
               <AppText variant="heading">Total</AppText>
@@ -880,6 +957,9 @@ const styles = StyleSheet.create({
   divider: { borderTopWidth: StyleSheet.hairlineWidth, marginVertical: 10 },
   input: { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, fontFamily: 'Poppins_400Regular' },
   appliedCoupon: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  rewardBtn: { width: 40, height: 40, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  rewardApplied: { flex: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  rewardAll: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, justifyContent: 'center' },
   gpsBtn: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center' },
   deliveryCard: { borderRadius: 12, borderWidth: 1, padding: 12 },
   deliveryMeta: { flexDirection: 'row', marginTop: 10, gap: 8 },

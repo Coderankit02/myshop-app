@@ -27,6 +27,8 @@ export default function RewardsScreen() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [stats, setStats] = useState<{ total: number; delivered: number; savings: number } | null>(null);
+  // Redeemable balance = earned (delivered×10) − already redeemed (server-computed)
+  const [redeemable, setRedeemable] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -44,6 +46,9 @@ export default function RewardsScreen() {
         delivered: orders.filter((o) => o.status === 'delivered').length,
         savings: orders.reduce((s, o) => s + (Number(o.discount) || 0), 0),
       });
+      // Redeemable balance (server-side — tamper-proof)
+      const r = await supabase.rpc('get_redeemable_points', { p_user_id: user.id });
+      if (active) setRedeemable(Number(r.data) || 0);
     })();
     return () => {
       active = false;
@@ -118,6 +123,26 @@ export default function RewardsScreen() {
           </View>
         </View>
 
+        {/* Redeemable card */}
+        {redeemable !== null && redeemable > 0 && (
+          <View style={[styles.redeemCard, { backgroundColor: theme.tintYellow.bg, borderColor: theme.tintYellow.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyBold" style={{ color: theme.tintYellow.text }}>
+                  ⭐ Redeemable Points
+                </AppText>
+                <AppText variant="caption" style={{ color: theme.tintYellow.text, marginTop: 2 }}>
+                  {redeemable} pts = {inr(Math.floor(redeemable / 10))} discount
+                </AppText>
+              </View>
+              <AppText style={{ fontSize: 26, fontWeight: '900', color: theme.tintYellow.text }}>{redeemable}</AppText>
+            </View>
+            <AppText variant="caption" style={{ color: theme.tintYellow.text, marginTop: 8 }}>
+              💡 Checkout par apply karo — 100 points = ₹10 OFF (coupon ke saath bhi chalega)
+            </AppText>
+          </View>
+        )}
+
         {/* Referral card */}
         <View style={[styles.referCard, { backgroundColor: theme.tintOrange.bg, borderColor: theme.tintOrange.border }]}>
           <AppText variant="bodyBold" color={theme.tintOrange.text}>
@@ -151,7 +176,7 @@ export default function RewardsScreen() {
           {[
             { i: '🛒', t: 'Order Karo', s: 'Har delivered order = 10 points', tint: theme.tintGreen },
             { i: '👥', t: 'Refer Karo', s: 'Dost ka pehla order = 50 bonus points', tint: theme.tintBlue },
-            { i: '⭐', t: 'Redeem Karo', s: '100 points = ₹10 discount (coming soon)', tint: theme.tintYellow },
+            { i: '⭐', t: 'Redeem Karo', s: '100 points = ₹10 discount — checkout par apply karo', tint: theme.tintYellow },
           ].map((r) => (
             <View key={r.t} style={styles.infoRow}>
               <View style={[styles.infoIcon, { backgroundColor: r.tint.bg }]}>
@@ -184,6 +209,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
+  redeemCard: { borderRadius: 18, borderWidth: 1.5, padding: 16, marginBottom: 14 },
   referCard: { borderRadius: 18, borderWidth: 1.5, padding: 16, marginBottom: 14 },
   refCodeBox: {
     flexDirection: 'row',
