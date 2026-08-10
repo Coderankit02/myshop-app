@@ -31,7 +31,12 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+
+# Firebase (EAS build ke liye locally rakho, commit mat karo)
+google-services.json
+GoogleService-Info.plist
 
 # typescript
 *.tsbuildinfo

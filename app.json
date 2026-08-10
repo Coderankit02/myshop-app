@@ -1,26 +1,32 @@
 {
   "expo": {
-    "name": "myshop-app",
-    "slug": "myshop-app",
+    "name": "Rinku Kirana Store",
+    "slug": "rinku-kirana-store",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myshopapp",
+    "scheme": "rinkukirana",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rinkukiranastore.app"
     },
     "android": {
+      "package": "com.rinkukiranastore.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#15803D",
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -28,15 +34,39 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#15803D",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 160
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Delivery distance check karne ke liye location chahiye."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#15803D",
+          "defaultChannel": "default",
+          "icon": "./assets/images/notification-icon.png"
+        }
+      ],
+      "expo-image-picker",
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "63a0244f-9d5b-4ed4-b215-05cf1c5ff334"
+      }
+    },
+    "owner": "rk-grocery-mart"
   }
 }
