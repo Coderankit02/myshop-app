@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "897474959296",
+    "project_id": "my-shop-76c34",
+    "storage_bucket": "my-shop-76c34.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:897474959296:android:b8e579defc4eccd0e31a25",
+        "android_client_info": {
+          "package_name": "com.rinkukiranastore.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "897474959296-kr580c0rkq2gsaj0uqov0um3jg5v299m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuBZuF5-RKhXczKnP89u_FL3IQf6-TyxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "897474959296-kr580c0rkq2gsaj0uqov0um3jg5v299m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
