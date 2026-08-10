@@ -34,8 +34,11 @@ yarn-error.*
 .env
 .env*.local
 
-# Firebase (EAS build ke liye locally rakho, commit mat karo)
-google-services.json
+# Firebase — google-services.json COMMIT karna zaroori hai (gitignore mat karo):
+# EAS cloud build server git archive se file uthata hai — gitignored file kabhi nahi
+# pahunchti, jisse FCM silently skip ho jata hai. Ye build-time config hai (APK mein
+# embed hoti hai), runtime secret nahi. Expo official recommendation: commit karo.
+# iOS FCM (GoogleService-Info.plist) — abhi use nahi hota (iOS push = APNs)
 GoogleService-Info.plist
 
 # typescript
