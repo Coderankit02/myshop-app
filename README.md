@@ -119,20 +119,25 @@ eas build --profile production --platform android # → Play Store AAB (signed)
 
 ## 🔔 Push Notifications (FCM setup — production ke liye zaroori)
 
-> ✅ **Ho chuka (2026-08-10):** `app.json` → `expo-notifications` plugin me
-> `googleServicesFile: "./google-services.json"` configured hai; `usePush.ts`
-> device token ko Supabase `device_tokens` table me save karta hai
-> (migration: `myshopadmin/supabase/fcm-device-tokens-migration.sql` —
-> production par applied ✓). Sirf Firebase console wale steps baki hain (niche).
+> ✅ **Ho chuka (2026-08-11):** `app.config.js` me `googleServicesFile`
+> **conditional** hai — file exist kare to build me auto-include (verified),
+> warna build normal chalta hai. `usePush.ts` device token ko Supabase
+> `device_tokens` table me save karta hai (migration:
+> `myshopadmin/supabase/fcm-device-tokens-migration.sql` — production applied ✓).
+> Sirf Firebase console wale steps baki hain (niche).
 
 Expo push Android production builds ke liye **Firebase Cloud Messaging (FCM)** chahiye:
 
 1. https://console.firebase.google.com → project banao → **Add Android app**
    (package: `com.rinkukiranastore.app`) → `google-services.json` download karo
-   aur **project root me rakh do** (`myshop-app/google-services.json` —
-   gitignored hai, build se pehle locally present hona chahiye).
-2. EAS se rebuild (`eas build --profile production --platform android`).
-   Config plugin `google-services.json` ko apne aap Android project me copy
+   aur **project root me rakh do** (`myshop-app/google-services.json`).
+2. **File ko git me COMMIT karo** (`git add google-services.json && git push`)
+   — EAS cloud build server git archive se file uthata hai; gitignored file
+   kabhi nahi pahunchti, jisse FCM silently skip ho jata hai. Isliye ye file
+   `.gitignore` se **hata di gayi hai** (build-time config hai, runtime secret
+   nahi — Expo ka official recommendation).
+3. EAS se rebuild (`eas build --profile production --platform android`).
+   `app.config.js` + config plugin file ko apne aap Android project me copy
    karega — alag se kuch nahi karna.
 3. Firebase → Project Settings → **Service Accounts** → **Generate new private
    key** (JSON) → `eas credentials` → Android → **FCM V1** key upload karo
