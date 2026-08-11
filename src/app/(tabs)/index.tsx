@@ -2,7 +2,7 @@
  * Home — port of the website's homepage (homepage_sections order respected).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -306,29 +306,56 @@ export default function HomeScreen() {
 /* ── Ad Images Strip (auto-scroll, no text, no dots) ── */
 function AdStripSection({ strip, onAdClick }: { strip: AdStrip; onAdClick: (img: { link_type: string; link_value: string | null }) => void }) {
   const { theme } = useTheme();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
   const scrollRef = useRef<ScrollView>(null);
   const idxRef = useRef(0);
+  const [vw, setVw] = useState(0);
+
+  // Auto-advance SIRF mobile par (desktop par saari images ek saath dikhti hain)
   useEffect(() => {
-    if (strip.images.length < 2) return;
+    if (isDesktop || strip.images.length < 2 || !vw) return;
     const t = setInterval(() => {
       idxRef.current = (idxRef.current + 1) % strip.images.length;
-      scrollRef.current?.scrollTo({ x: idxRef.current * 224, animated: true });
+      scrollRef.current?.scrollTo({ x: idxRef.current * vw, animated: true });
     }, 3500);
     return () => clearInterval(t);
-  }, [strip.images.length]);
+  }, [strip.images.length, isDesktop, vw]);
+
+  // Desktop/tablet: sab images ek row me barabar width (3 ya 4 jo bhi ho)
+  if (isDesktop) {
+    return (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        {strip.images.map((img) => (
+          <Pressable
+            key={img.id}
+            onPress={() => onAdClick(img)}
+            style={({ pressed }) => [
+              { flexGrow: 1, flexBasis: 0, minWidth: 0, borderRadius: 14, overflow: 'hidden', borderWidth: 1.5, backgroundColor: theme.light, transform: [{ scale: pressed ? 0.97 : 1 }] },
+              { borderColor: theme.border },
+            ]}>
+            <Image source={{ uri: img.image_url }} style={{ width: '100%', height: 160 }} resizeMode="cover" />
+          </Pressable>
+        ))}
+      </View>
+    );
+  }
+
+  // Mobile: full-width ek image, snap paging, auto-change
   return (
     <ScrollView
       ref={scrollRef}
       horizontal
+      pagingEnabled
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 12 }}>
+      onLayout={(e) => setVw(e.nativeEvent.layout.width)}
+      style={{ borderRadius: 14, overflow: 'hidden' }}>
       {strip.images.map((img) => (
         <Pressable
           key={img.id}
           onPress={() => onAdClick(img)}
           style={({ pressed }) => [
-            styles.adImageCard,
-            { backgroundColor: theme.light, borderColor: theme.border, transform: [{ scale: pressed ? 0.97 : 1 }] },
+            { width: vw || '100%', height: Math.round((vw || 360) * 0.4), backgroundColor: theme.light, transform: [{ scale: pressed ? 0.97 : 1 }] },
           ]}>
           <Image source={{ uri: img.image_url }} style={styles.adImage} resizeMode="cover" />
         </Pressable>
