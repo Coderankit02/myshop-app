@@ -49,6 +49,7 @@ export default function ShopScreen() {
     search: isSearchActive ? search : '',
     page,
     pageSize,
+    enabled: !isSearchActive, // search active par products query waste mat karo
   });
 
   const rawProds = isSearchActive ? searchResults : products;

@@ -28,22 +28,51 @@ export function BannerCarousel({ banners, loading, onPress, height = 150 }: Bann
   // Har slide ke text block ka onLayout measure hota hai → sabse badi height use hoti hai.
   const [contentH, setContentH] = useState(0);
 
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const t = setInterval(() => {
+  // Auto-advance timer ko ref me rakhte hain taaki touch/swipe ke dauran
+  // pause/resume kar saken (site wala bug fix — interval user ke haath se na ladhe)
+  const autoTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startAuto = () => {
+    if (autoTimer.current) clearInterval(autoTimer.current);
+    autoTimer.current = setInterval(() => {
       setIdx((i) => {
         const next = (i + 1) % banners.length;
         scrollRef.current?.scrollTo({ x: next * WIDTH, animated: true });
         return next;
       });
     }, 4000);
-    return () => clearInterval(t);
+  };
+  const stopAuto = () => {
+    if (autoTimer.current) clearInterval(autoTimer.current);
+    autoTimer.current = null;
+    // Pending resume bhi cancel — stacked timers se user ke swipe se ladai na ho
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = null;
+  };
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    startAuto();
+    return () => {
+      stopAuto();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [banners.length, WIDTH]);
 
   const onMomentumEnd = (e: any) => {
+    if (banners.length <= 1) return;
     const i = Math.round(e.nativeEvent.contentOffset.x / WIDTH);
     setIdx(Math.max(0, Math.min(i, banners.length - 1)));
+    // User ka swipe khatam → 2s baad auto-advance wapas (turant nahi, taaki
+    // user ko scroll settle karne ka waqt mile). Purana resume pehle cancel.
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => {
+      resumeTimer.current = null;
+      startAuto();
+    }, 2000);
   };
+
+  const onDragStart = () => stopAuto();
 
   if (loading) return <View style={[styles.container, { height }]}><SkelBanner /></View>;
   if (!banners.length) return null;
@@ -55,6 +84,7 @@ export function BannerCarousel({ banners, loading, onPress, height = 150 }: Bann
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={onDragStart}
         onMomentumScrollEnd={onMomentumEnd}
         // Explicit width = slide width → paging hamesha sahi snap karta hai (web scrollbar gap khatam)
         style={{ width: WIDTH, borderRadius: 18 }}>

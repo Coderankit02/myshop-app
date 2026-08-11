@@ -69,12 +69,15 @@ export function useProducts(options: {
   search?: string;
   page?: number;
   pageSize?: number;
+  enabled?: boolean;
 }) {
-  const { categoryId, featured, search, page = 1, pageSize = 24 } = options;
+  const { categoryId, featured, search, page = 1, pageSize = 24, enabled = true } = options;
   const [products, setProducts] = useState<EnrichedProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [total, setTotal] = useState(0);
   const loadId = useRef(0);
+  // Pagination append: page 1 reset, page 2+ same query par append karo
+  const querySigRef = useRef('');
 
   const fetch = useCallback(async () => {
     const fid = ++loadId.current;
@@ -95,7 +98,16 @@ export function useProducts(options: {
       q = q.range(from, from + pageSize - 1);
       const { data, count } = await q;
       if (fid !== loadId.current) return;
-      setProducts((data || []).map(enrichProduct));
+      const sig = `${categoryId}|${featured}|${search}|${pageSize}`;
+      const sameQuery = querySigRef.current === sig;
+      querySigRef.current = sig;
+      // Page 1 ya query change → replace; page 2+ same query → append
+      setProducts((prev) => {
+        const fresh = (data || []).map(enrichProduct);
+        if (page <= 1 || !sameQuery) return fresh;
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...fresh.filter((p) => !seen.has(p.id))];
+      });
       setTotal(count || 0);
     } catch {
       if (fid === loadId.current) setProducts([]);
@@ -105,8 +117,12 @@ export function useProducts(options: {
   }, [categoryId, featured, search, page, pageSize]);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     fetch();
-  }, [fetch]);
+  }, [fetch, enabled]);
 
   return { products, loading, total, totalPages: Math.ceil(total / pageSize), refetch: fetch };
 }
