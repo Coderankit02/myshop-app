@@ -2,7 +2,7 @@
  * Auth — Login / Signup (port of the website's AuthModal + auth pages).
  * Same Supabase calls, same friendly Hinglish error messages.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,14 +13,26 @@ import { AppText } from '@/components/AppText';
 import { Field } from '@/components/Field';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { friendlyAuthError, passwordStrength, STRENGTH_COLORS, STRENGTH_LABELS } from '@/lib/helpers';
+import { signInWithProvider, useSocialProviders, GoogleIcon, FacebookIcon } from '@/lib/socialAuth';
 
 type Mode = 'login' | 'signup';
 
 export default function AuthScreen() {
   const { theme } = useTheme();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, session } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
+  const socialStatus = useSocialProviders();
+  // Social login ke baad (native deep-link ya web redirect) session set hote hi
+  // screen auto-close ho jaye.
+  const socialStartedRef = useRef(false);
+  useEffect(() => {
+    if (session && socialStartedRef.current) {
+      socialStartedRef.current = false;
+      showToast('Welcome back! 🎉');
+      router.back();
+    }
+  }, [session, router, showToast]);
 
   const [mode, setMode] = useState<Mode>('login');
 
@@ -61,6 +73,21 @@ export default function AuthScreen() {
     }
     showToast('Welcome back! 🎉');
     router.back();
+  };
+
+  const handleSocial = async (provider: 'google' | 'facebook') => {
+    if (loading) return;
+    setError(null);
+    setLoading(true);
+    socialStartedRef.current = true;
+    const err = await signInWithProvider(provider);
+    if (err) {
+      socialStartedRef.current = false;
+      setLoading(false);
+      setError(err);
+    }
+    // Success (native): session effect fire hoga → auto close.
+    // Success (web): page redirect hua tha — wapas aane par session effect close karega.
   };
 
   const handleSignup = async () => {
@@ -210,6 +237,7 @@ export default function AuthScreen() {
                 Signup Karein →
               </AppText>
             </AppText>
+            <SocialButtons status={socialStatus} loading={loading} onPress={handleSocial} theme={theme} />
           </View>
         ) : (
           <View style={{ marginTop: 8 }}>
@@ -274,10 +302,56 @@ export default function AuthScreen() {
                 Login Karein →
               </AppText>
             </AppText>
+            <SocialButtons status={socialStatus} loading={loading} onPress={handleSocial} theme={theme} />
           </View>
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/* ── Google / Facebook buttons (login + signup dono me) ─────────── */
+function SocialButtons({
+  status,
+  loading,
+  onPress,
+  theme,
+}: {
+  status: { google: boolean; facebook: boolean };
+  loading: boolean;
+  onPress: (p: 'google' | 'facebook') => void;
+  theme: any;
+}) {
+  const buttons = [
+    { key: 'google' as const, label: 'Google se Login Karein', Icon: GoogleIcon },
+    { key: 'facebook' as const, label: 'Facebook se Login Karein', Icon: FacebookIcon },
+  ].filter((b) => status[b.key]);
+  if (!buttons.length) return null;
+  return (
+    <View style={{ marginTop: 16 }}>
+      <View style={styles.dividerRow}>
+        <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+        <AppText variant="caption" color={theme.gray} style={{ marginHorizontal: 10 }}>
+          ya
+        </AppText>
+        <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+      </View>
+      {buttons.map(({ key, label, Icon }) => (
+        <Pressable
+          key={key}
+          onPress={() => onPress(key)}
+          disabled={loading}
+          style={({ pressed }) => [
+            styles.socialBtn,
+            { backgroundColor: theme.cardBg, borderColor: theme.border, opacity: pressed ? 0.85 : 1 },
+          ]}>
+          <Icon />
+          <AppText variant="bodyBold" color={theme.dark} style={{ flex: 1 }}>
+            {label}
+          </AppText>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -297,4 +371,17 @@ const styles = StyleSheet.create({
   errorBox: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 12 },
   strengthSeg: { flex: 1, height: 4, borderRadius: 2 },
   checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  socialBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
 });

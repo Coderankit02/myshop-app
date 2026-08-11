@@ -56,12 +56,15 @@ export default function CartScreen() {
                 <AppText style={{ fontSize: 22 }}>{item.e || '🛒'}</AppText>
               )}
             </View>
-            <View style={{ flex: 1 }}>
-              <AppText variant="bodyBold" numberOfLines={2}>
-                {item.name}
-              </AppText>
+            <View style={styles.itemInfo}>
+              <View style={styles.nameSlot}>
+                <AppText variant="bodyBold" numberOfLines={2}>
+                  {item.name}
+                </AppText>
+              </View>
+              {/* Caption line hamesha render hota hai (empty ho to invisible) taaki sabhi rows ki height equal rahe */}
               <AppText variant="caption" color={theme.gray}>
-                {item.unit || item.variant}
+                {item.unit || item.variant || '\u00A0'}
               </AppText>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                 <AppText variant="price">{inr(item.price * item.qty)}</AppText>
@@ -129,6 +132,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   itemImg: { width: 64, height: 64, borderRadius: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  itemInfo: { flex: 1, justifyContent: 'center' },
+  // 2-line naam slot (bodyBold lineHeight 20 × 2) — rows hamesha barabar height ki hongi
+  nameSlot: { minHeight: 40, justifyContent: 'flex-start' },
   stepper: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 4, paddingVertical: 3 },
   stepBtn: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   removeBtn: { position: 'absolute', top: 10, right: 10 },

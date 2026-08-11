@@ -1,7 +1,7 @@
 /**
  * Home — port of the website's homepage (homepage_sections order respected).
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
-import { useBanners, useCategories, useHomeSections, useHomepageConfig, useReviews } from '@/hooks/useData';
+import { useBanners, useCategories, useHomeSections, useHomepageConfig, useReviews, useAdStrips, type AdStrip } from '@/hooks/useData';
 import { AppText } from '@/components/AppText';
 import { BannerCarousel } from '@/components/BannerCarousel';
 import { CategoryRail } from '@/components/CategoryRail';
@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const { sections: homeSections, loading: homeLoading, refetch: refetchHome } = useHomeSections();
   const { sections: homepageSections, refetch: refetchConfig } = useHomepageConfig();
   const { reviews } = useReviews();
+  const { strips: adStrips } = useAdStrips();
 
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -121,6 +122,13 @@ export default function HomeScreen() {
     router.push('/shop');
     showToast(b.title || 'Offer dekhein! 🎉');
   };
+  const onAdClick = (img: { link_type: string; link_value: string | null }) => {
+    if (img.link_type === 'category' && img.link_value) {
+      router.push({ pathname: '/shop', params: { cat: img.link_value } });
+    } else if (img.link_type === 'product' && img.link_value) {
+      router.push({ pathname: '/product/[id]', params: { id: img.link_value } });
+    }
+  };
   const goProduct = (p: Product) => router.push({ pathname: '/product/[id]', params: { id: p.id } });
   const goCategory = (id: string) => router.push({ pathname: '/shop', params: { cat: id } });
   const goShop = () => router.push('/shop');
@@ -158,8 +166,8 @@ export default function HomeScreen() {
             </View>
             <CountdownTimer compact />
           </View>
-          <View style={{ marginTop: 12 }}>
-            <SectionRail title="" products={homeSections.flash} loading={homeLoading} onProductPress={goProduct} />
+          <View style={{ marginTop: 10 }}>
+            <SectionRail title="" products={homeSections.flash} loading={homeLoading} onProductPress={goProduct} compact />
           </View>
         </View>
       ),
@@ -201,14 +209,24 @@ export default function HomeScreen() {
     ));
   }, [cats, sectionProds, sectionProdsReady]);
 
-  // Final ordered sections (mirror homepage builder config)
-  const rendered = homepageSections
-    .map((key) => {
-      if (key === 'category_sections') return categorySections;
-      return sectionsMap[key] || null;
-    })
-    .flat()
-    .filter(Boolean);
+  // Final ordered sections (mirror homepage builder config) + ad strips beech me
+  const rendered = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    homepageSections.forEach((key, i) => {
+      const node = key === 'category_sections' ? categorySections : sectionsMap[key] || null;
+      if (!node) return;
+      const items = Array.isArray(node) ? node : [node];
+      items.forEach((item, idx) => out.push(<View key={`${key}-${idx}`}>{item}</View>));
+      const pos = i + 1;
+      adStrips
+        .filter((s) => s.position === pos)
+        .forEach((s) => out.push(<AdStripSection key={`ad-${s.id}`} strip={s} onAdClick={onAdClick} />));
+    });
+    adStrips
+      .filter((s) => s.position > homepageSections.length)
+      .forEach((s) => out.push(<AdStripSection key={`ad-${s.id}`} strip={s} onAdClick={onAdClick} />));
+    return out;
+  }, [homepageSections, categorySections, sectionsMap, adStrips, onAdClick]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.pageBg }}>
@@ -245,8 +263,9 @@ export default function HomeScreen() {
             onChangeText={setSearch}
             onSubmitEditing={submitSearch}
             returnKeyType="search"
-            placeholder="Kya dhoondh rahe hain? Sabzi, atta, doodh…"
+            placeholder="Kya dhoondh rahe hain?"
             placeholderTextColor={theme.muted}
+            numberOfLines={1}
             style={[styles.searchInput, { color: theme.dark }]}
           />
           {search.length > 0 && (
@@ -281,6 +300,40 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/* ── Ad Images Strip (auto-scroll, no text, no dots) ── */
+function AdStripSection({ strip, onAdClick }: { strip: AdStrip; onAdClick: (img: { link_type: string; link_value: string | null }) => void }) {
+  const { theme } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const idxRef = useRef(0);
+  useEffect(() => {
+    if (strip.images.length < 2) return;
+    const t = setInterval(() => {
+      idxRef.current = (idxRef.current + 1) % strip.images.length;
+      scrollRef.current?.scrollTo({ x: idxRef.current * 224, animated: true });
+    }, 3500);
+    return () => clearInterval(t);
+  }, [strip.images.length]);
+  return (
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 12 }}>
+      {strip.images.map((img) => (
+        <Pressable
+          key={img.id}
+          onPress={() => onAdClick(img)}
+          style={({ pressed }) => [
+            styles.adImageCard,
+            { backgroundColor: theme.light, borderColor: theme.border, transform: [{ scale: pressed ? 0.97 : 1 }] },
+          ]}>
+          <Image source={{ uri: img.image_url }} style={styles.adImage} resizeMode="cover" />
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -365,7 +418,15 @@ function WhyChooseUs() {
 /* ── Reviews ───────────────────────────────────────────── */
 function ReviewsSection({ reviews }: { reviews: any[] }) {
   const { theme } = useTheme();
-  if (!reviews.length) return null;
+  // Site ki tarah: approved reviews na hon to curated fallback dikhta hai —
+  // section kabhi khaali nahi dikhta.
+  const fallback = [
+    { customer_name: 'Priya Sharma', rating: 5, comment: 'Roj ka saman ab online — fresh sabziyan aur 1-2 ghante mein delivery! Bahut badhiya service.' },
+    { customer_name: 'Rahul Verma', rating: 5, comment: 'Rate market se kam hain aur coupons se aur bachat. UPI payment ekdum aasaan.' },
+    { customer_name: 'Sunita Devi', rating: 4, comment: 'Ananya AI se pooch kar order kiya — bilkul sahi product mila. Highly recommended!' },
+    { customer_name: 'Amit Yadav', rating: 5, comment: 'COD option hone se ghar walon ko bhi bharosa hai. RK Grocery Mart = ghar ki dukaan.' },
+  ];
+  const list = reviews.length ? reviews : fallback;
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -379,7 +440,7 @@ function ReviewsSection({ reviews }: { reviews: any[] }) {
         </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 12 }}>
-        {reviews.map((r, i) => {
+        {list.map((r, i) => {
           const stars = Math.max(1, Math.min(5, r.rating || 5));
           return (
             <View key={i} style={[styles.reviewCard, { backgroundColor: theme.cardBg, borderColor: theme.border, width: 250 }]}>
@@ -499,7 +560,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     height: 44,
   },
-  searchInput: { flex: 1, fontSize: 13, fontFamily: 'Poppins_400Regular', padding: 0 },
+  searchInput: { flex: 1, fontSize: 13, fontFamily: 'Poppins_400Regular', padding: 0, paddingVertical: 0 },
   announce: { marginHorizontal: 16, marginTop: 12, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
   flashCard: { borderRadius: 20, padding: 14 },
   flashHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
@@ -520,4 +581,6 @@ const styles = StyleSheet.create({
   shareBtn: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
   newsInput: { flex: 1, borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, fontSize: 13, fontFamily: 'Poppins_400Regular' },
   howCard: { borderRadius: 16, padding: 18 },
+  adImageCard: { width: 212, height: 120, borderRadius: 16, borderWidth: 1.5, overflow: 'hidden' },
+  adImage: { width: '100%', height: '100%' },
 });

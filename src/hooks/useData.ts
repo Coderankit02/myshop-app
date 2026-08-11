@@ -226,6 +226,44 @@ export function useHomepageConfig() {
   return { sections, refetch: fetch };
 }
 
+/* ── Homepage Ad Strips (auto-scroll images, no text/dots) ── */
+export interface AdStrip {
+  id: string;
+  title: string;
+  position: number;
+  images: { id: string; image_url: string; link_type: 'none' | 'category' | 'product'; link_value: string | null; sort_order: number }[];
+}
+export function useAdStrips() {
+  const [strips, setStrips] = useState<AdStrip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetch = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('homepage_ad_sections')
+        .select('id,title,position,homepage_ad_images(id,image_url,link_type,link_value,sort_order)')
+        .eq('is_active', true)
+        .order('position', { ascending: true });
+      if (error) return;
+      const out = (data || [])
+        .map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          position: s.position,
+          images: (s.homepage_ad_images || []).sort((a: any, b: any) => a.sort_order - b.sort_order),
+        }))
+        .filter((s) => s.images.length > 0);
+      setStrips(out);
+    } catch {
+      // keep []
+    }
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+  return { strips, loading, refetch: fetch };
+}
+
 /* ── Customer reviews (approved only, mirror useReviews) ── */
 export function useReviews() {
   const [reviews, setReviews] = useState<Review[]>([]);

@@ -12,7 +12,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // Web par OAuth (Google/Facebook) ka PKCE code URL se auto-detected hota
+    // hai — native par flow hum manually handle karte hain (socialAuth.ts).
+    detectSessionInUrl: true,
   },
 });
 

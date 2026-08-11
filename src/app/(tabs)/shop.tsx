@@ -2,7 +2,7 @@
  * Shop — search, category chips, sort/filter, 2-column product grid, pagination.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
@@ -30,6 +30,7 @@ export default function ShopScreen() {
   const [sortBy, setSortBy] = useState('default');
   const [inStockOnly, setInStockOnly] = useState(false);
   const [page, setPage] = useState(1);
+  const [filterOpen, setFilterOpen] = useState(false);
   const pageSize = 24;
 
   // Keep in sync with deep-linked params
@@ -62,6 +63,8 @@ export default function ShopScreen() {
 
   const activeCatName = cats.find((c) => c.id === activeCat)?.name || 'All Products';
   const countLabel = shopLoading ? 'Loading…' : `${sorted.length} Products`;
+  // Filters active hain? (☰ button highlight ke liye)
+  const filterActive = activeCat !== 'all' || sortBy !== 'default' || inStockOnly;
 
   const onEndReached = () => {
     if (!isSearchActive && !shopLoading && page < totalPages) setPage((p) => p + 1);
@@ -69,7 +72,7 @@ export default function ShopScreen() {
 
   const renderItem = ({ item }: { item: Product }) => (
     <View style={{ flex: 1, maxWidth: '50%' }}>
-      <View style={{ paddingHorizontal: 5, marginBottom: 12 }}>
+      <View style={{ paddingHorizontal: 5, marginBottom: 12, flexGrow: 1 }}>
         <ProductCard p={item} onPress={(p) => router.push({ pathname: '/product/[id]', params: { id: p.id } })} />
       </View>
     </View>
@@ -77,12 +80,20 @@ export default function ShopScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.pageBg }}>
-      {/* Search + sort header */}
+      {/* Search + header (filters ab ☰ drawer me) */}
       <View style={[styles.header, { backgroundColor: theme.cardBg, borderBottomColor: theme.border }]}>
         <View style={styles.topRow}>
           <AppText variant="title" style={{ flex: 1 }}>
             Shop 🛍️
           </AppText>
+          <Pressable
+            onPress={() => setFilterOpen(true)}
+            hitSlop={8}
+            style={[styles.iconBtn, { backgroundColor: filterActive ? theme.primary : theme.primaryLight }]}>
+            <AppText style={{ fontSize: 16, color: filterActive ? '#fff' : theme.dark, fontWeight: '700' }}>
+              ☰
+            </AppText>
+          </Pressable>
           <Pressable
             onPress={() => router.push('/wishlist')}
             hitSlop={8}
@@ -101,6 +112,7 @@ export default function ShopScreen() {
             returnKeyType="search"
             placeholder="Products search karein…"
             placeholderTextColor={theme.muted}
+            numberOfLines={1}
             style={[styles.searchInput, { color: theme.dark }]}
           />
           {search.length > 0 && (
@@ -111,49 +123,108 @@ export default function ShopScreen() {
             </Pressable>
           )}
         </View>
+      </View>
 
-        {/* Category chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 10 }}>
-          <Chip label="All" active={activeCat === 'all'} onPress={() => { setActiveCat('all'); setPage(1); }} theme={theme} />
-          {cats.map((c) => (
-            <Chip
-              key={c.id}
-              label={c.name}
-              active={activeCat === c.id}
-              onPress={() => { setActiveCat(c.id); setPage(1); }}
-              theme={theme}
-            />
-          ))}
-        </ScrollView>
-
-        {/* Sort + in-stock */}
-        <View style={styles.filterRow}>
-          <View style={[styles.countBox, { backgroundColor: theme.light }]}>
-            <AppText variant="captionBold" color={theme.dark}>
-              {countLabel}
-            </AppText>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {SORT_OPTIONS.map((o) => (
-              <Pressable
-                key={o.v}
-                onPress={() => setSortBy(o.v)}
-                style={[styles.filterChip, { backgroundColor: sortBy === o.v ? theme.primary : theme.cardBg, borderColor: sortBy === o.v ? theme.primary : theme.border }]}>
-                <AppText variant="captionBold" color={sortBy === o.v ? '#fff' : theme.dark}>
-                  {o.l}
+      {/* ── Filter drawer (☰): categories + sort + in-stock ── */}
+      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setFilterOpen(false)} />
+          <View style={[styles.filterSheet, { backgroundColor: theme.cardBg }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
+            <View style={styles.sheetHead}>
+              <AppText variant="title" style={{ flex: 1 }}>
+                Filters & Categories
+              </AppText>
+              <Pressable onPress={() => setFilterOpen(false)} hitSlop={10}>
+                <AppText variant="bodyBold" style={{ fontSize: 18 }}>
+                  ✕
                 </AppText>
               </Pressable>
-            ))}
-            <Pressable
-              onPress={() => setInStockOnly((v) => !v)}
-              style={[styles.filterChip, { backgroundColor: inStockOnly ? theme.primary : theme.cardBg, borderColor: inStockOnly ? theme.primary : theme.border }]}>
-              <AppText variant="captionBold" color={inStockOnly ? '#fff' : theme.dark}>
-                {inStockOnly ? '✓' : ''} In stock only
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
+              <AppText variant="bodyBold" color={theme.gray} style={styles.sheetLabel}>
+                Categories
               </AppText>
-            </Pressable>
-          </ScrollView>
+              <View style={styles.chipWrap}>
+                <Chip
+                  label="All"
+                  active={activeCat === 'all'}
+                  onPress={() => {
+                    setActiveCat('all');
+                    setPage(1);
+                  }}
+                  theme={theme}
+                />
+                {cats.map((c) => (
+                  <Chip
+                    key={c.id}
+                    label={c.name}
+                    active={activeCat === c.id}
+                    onPress={() => {
+                      setActiveCat(c.id);
+                      setPage(1);
+                    }}
+                    theme={theme}
+                  />
+                ))}
+              </View>
+
+              <AppText variant="bodyBold" color={theme.gray} style={styles.sheetLabel}>
+                Sort By
+              </AppText>
+              <View style={styles.chipWrap}>
+                {SORT_OPTIONS.map((o) => (
+                  <Pressable
+                    key={o.v}
+                    onPress={() => setSortBy(o.v)}
+                    style={[styles.filterChip, { backgroundColor: sortBy === o.v ? theme.primary : theme.cardBg, borderColor: sortBy === o.v ? theme.primary : theme.border }]}>
+                    <AppText variant="captionBold" color={sortBy === o.v ? '#fff' : theme.dark}>
+                      {o.l}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+
+              <AppText variant="bodyBold" color={theme.gray} style={styles.sheetLabel}>
+                Availability
+              </AppText>
+              <Pressable
+                onPress={() => setInStockOnly((v) => !v)}
+                style={[styles.inStockRow, { backgroundColor: inStockOnly ? theme.primaryLight : theme.light, borderColor: inStockOnly ? theme.primary : theme.border }]}>
+                <AppText style={{ fontSize: 15 }}>{inStockOnly ? '✅' : '⬜'}</AppText>
+                <AppText variant="bodyBold" color={theme.dark} style={{ flex: 1 }}>
+                  Sirf in-stock products
+                </AppText>
+              </Pressable>
+
+              <View style={[styles.countBox, { backgroundColor: theme.light, alignSelf: 'flex-start', marginTop: 12 }]}>
+                <AppText variant="captionBold" color={theme.dark}>
+                  {countLabel}
+                </AppText>
+              </View>
+            </ScrollView>
+            <View style={[styles.sheetFooter, { borderTopColor: theme.border }]}>
+              <Pressable
+                onPress={() => {
+                  setActiveCat('all');
+                  setSortBy('default');
+                  setInStockOnly(false);
+                  setPage(1);
+                }}
+                style={[styles.clearBtn, { borderColor: theme.border }]}>
+                <AppText variant="captionBold" color={theme.gray}>
+                  Clear Filters
+                </AppText>
+              </Pressable>
+              <Pressable onPress={() => setFilterOpen(false)} style={[styles.doneBtn, { backgroundColor: theme.primary }]}>
+                <AppText variant="captionBold" color="#fff">
+                  Done ✓
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </View>
+      </Modal>
 
       {/* Grid */}
       {shopLoading && page === 1 ? (
@@ -243,19 +314,60 @@ const styles = StyleSheet.create({
     marginTop: 10,
     height: 44,
   },
-  searchInput: { flex: 1, fontSize: 13, fontFamily: 'Poppins_400Regular', padding: 0 },
+  searchInput: { flex: 1, fontSize: 13, fontFamily: 'Poppins_400Regular', padding: 0, paddingVertical: 0 },
   catChip: {
     borderRadius: 20,
     borderWidth: 1.5,
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   countBox: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
   filterChip: {
     borderRadius: 10,
     borderWidth: 1.5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  filterSheet: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
+    maxHeight: '78%',
+  },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  sheetLabel: { marginTop: 14, marginBottom: 8 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  inStockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  sheetFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+  },
+  clearBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  doneBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
   },
 });

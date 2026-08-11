@@ -3,7 +3,7 @@
  * related products. Port of the website's ProductDetail.jsx.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -35,6 +35,60 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selUnit, setSelUnit] = useState(0);
+
+  // ── Reviews ──
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadReviews = async (productId: string) => {
+    const { data } = await supabase
+      .from('reviews')
+      .select('customer_name,rating,comment,admin_reply,created_at')
+      .eq('product_id', productId)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setReviews(data || []);
+  };
+
+  useEffect(() => {
+    if (id) loadReviews(id);
+  }, [id]);
+
+  const submitReview = async () => {
+    if (!user) {
+      showToast('Review dene ke liye login karein 🔐');
+      router.push('/auth');
+      return;
+    }
+    const text = comment.trim();
+    if (text.length < 3) {
+      showToast('Thoda aur likhein — kam se kam 3 letters 🙏');
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from('reviews').insert({
+      product_id: product?.id,
+      user_id: user.id,
+      customer_name: user.name || 'Customer',
+      rating,
+      comment: text,
+      status: 'pending',
+    });
+    setSubmitting(false);
+    if (error) {
+      showToast('Review submit nahi hua — dobara try karein');
+      return;
+    }
+    setComment('');
+    showToast('Shukriya! Review admin approval ke baad dikhega ⭐');
+    // approved hone par turant dikhe — abhi thodi der me refresh
+    setTimeout(() => {
+      if (id) loadReviews(id);
+    }, 2500);
+  };
 
   useEffect(() => {
     let active = true;
@@ -154,11 +208,14 @@ export default function ProductDetailScreen() {
       </View>
 
       <FlatList
-        data={[{ key: 'main' }, { key: 'related' }]}
+        data={[{ key: 'main' }, { key: 'related' }, { key: 'reviews' }]}
         keyExtractor={(i) => i.key}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
         renderItem={({ item }) => {
+          if (item.key === 'reviews') {
+            return <ProductReviews product={product} reviews={reviews} user={user} rating={rating} setRating={setRating} comment={comment} setComment={setComment} submitting={submitting} onSubmit={submitReview} onLogin={() => router.push('/auth')} theme={theme} />;
+          }
           if (item.key === 'related') {
             return related.length ? (
               <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
@@ -341,6 +398,114 @@ export default function ProductDetailScreen() {
   );
 }
 
+/* ── Product Reviews (list + submit) ─────────────────────────── */
+function ProductReviews({
+  product,
+  reviews,
+  user,
+  rating,
+  setRating,
+  comment,
+  setComment,
+  submitting,
+  onSubmit,
+  onLogin,
+  theme,
+}: {
+  product: Product;
+  reviews: any[];
+  user: any;
+  rating: number;
+  setRating: (r: number) => void;
+  comment: string;
+  setComment: (c: string) => void;
+  submitting: boolean;
+  onSubmit: () => void;
+  onLogin: () => void;
+  theme: any;
+}) {
+  return (
+    <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
+      <View style={[styles.descCard, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+        <AppText variant="heading">
+          ⭐ Customer Reviews <AppText variant="caption" color={theme.gray}>({reviews.length})</AppText>
+        </AppText>
+
+        {/* Submit form */}
+        {user ? (
+          <View style={{ marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Pressable key={s} onPress={() => setRating(s)} hitSlop={4}>
+                  <AppText style={{ fontSize: 22, color: s <= rating ? '#FFB800' : theme.border }}>
+                    ★
+                  </AppText>
+                </Pressable>
+              ))}
+              <AppText variant="caption" color={theme.gray} style={{ marginLeft: 6, alignSelf: 'center' }}>
+                {rating}/5
+              </AppText>
+            </View>
+            <TextInput
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Product ke baare mein apna experience likhein…"
+              placeholderTextColor={theme.muted}
+              multiline
+              style={[
+                styles.reviewInput,
+                { backgroundColor: theme.light, borderColor: theme.border, color: theme.dark },
+              ]}
+            />
+            <Pressable onPress={onSubmit} disabled={submitting} style={[styles.reviewSubmit, { backgroundColor: submitting ? theme.muted : theme.primary }]}>
+              <AppText variant="captionBold" color="#fff">
+                {submitting ? 'Bhej rahe hain…' : '📨 Review Bhejein'}
+              </AppText>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable onPress={onLogin} style={[styles.reviewLogin, { backgroundColor: theme.primaryLight, borderColor: theme.primary }]}>
+            <AppText variant="bodyBold" color={theme.primaryDark}>
+              🔐 Login karke review dein
+            </AppText>
+          </Pressable>
+        )}
+
+        {/* List */}
+        {reviews.length ? (
+          <View style={{ marginTop: 14, gap: 12 }}>
+            {reviews.map((r, i) => (
+              <View key={i} style={[styles.reviewItem, { borderTopColor: theme.border }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <AppText variant="captionBold">{r.customer_name || 'Customer'}</AppText>
+                  <AppText style={{ color: '#FFB800', fontSize: 12 }}>{'★'.repeat(Math.max(1, Math.min(5, r.rating || 5)))}</AppText>
+                </View>
+                <AppText variant="body" color={theme.text} style={{ marginTop: 4, lineHeight: 19 }}>
+                  {r.comment}
+                </AppText>
+                {r.admin_reply ? (
+                  <View style={[styles.adminReply, { backgroundColor: theme.primaryLight }]}>
+                    <AppText variant="tiny" color={theme.primaryDark} style={{ fontWeight: '700' }}>
+                      🛡️ Store ka reply:
+                    </AppText>
+                    <AppText variant="caption" color={theme.text} style={{ marginTop: 2 }}>
+                      {r.admin_reply}
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <AppText variant="caption" color={theme.gray} center style={{ marginTop: 14 }}>
+            Abhi koi review nahi — pehle aap likhein! ✍️
+          </AppText>
+        )}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
@@ -375,6 +540,32 @@ const styles = StyleSheet.create({
   unitChip: { borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', minWidth: 70 },
   oosBox: { borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 16, alignItems: 'center' },
   descCard: { borderRadius: 16, borderWidth: 1, padding: 14 },
+  reviewInput: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
+    fontSize: 13,
+    fontFamily: 'Poppins_400Regular',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  reviewSubmit: {
+    marginTop: 10,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  reviewLogin: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  reviewItem: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  adminReply: { borderRadius: 10, padding: 10, marginTop: 8 },
   bottomBar: {
     position: 'absolute',
     left: 0,

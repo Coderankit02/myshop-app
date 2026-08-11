@@ -105,7 +105,8 @@ export function ProductCard({ p, onPress, onWishlistPress }: ProductCardProps) {
 
       {/* Body */}
       <View style={styles.body}>
-        <AppText variant="bodyBold" numberOfLines={2} style={{ minHeight: 38 }}>
+        {/* Fixed 2-line box → 1-line aur 2-line naam dono me card ki lambai same */}
+        <AppText variant="bodyBold" numberOfLines={2} style={styles.name}>
           {p.name}
         </AppText>
         <View style={styles.unitRow}>
@@ -180,10 +181,11 @@ export function ProductCard({ p, onPress, onWishlistPress }: ProductCardProps) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, overflow: 'hidden', elevation: 2 },
+  card: { borderRadius: 16, overflow: 'hidden', elevation: 2, flexGrow: 1 },
   imgWrap: { position: 'relative', aspectRatio: 1 },
   img: { width: '100%', height: '100%' },
   imgFallback: { alignItems: 'center', justifyContent: 'center' },
+  name: { height: 38, lineHeight: 19 },
   badge: {
     position: 'absolute',
     top: 8,
@@ -221,7 +223,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  body: { padding: 10 },
+  body: { flex: 1, padding: 10 },
   unitRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   sizesChip: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   priceRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8 },

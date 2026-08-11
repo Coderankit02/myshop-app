@@ -16,10 +16,13 @@ interface SectionRailProps {
   onSeeAll?: () => void;
   onProductPress?: (p: Product) => void;
   gradientTitle?: boolean;
+  /** compact (flash sale jaise tight containers) ke liye chhote cards */
+  compact?: boolean;
 }
 
-export function SectionRail({ title, products, loading, onSeeAll, onProductPress, gradientTitle }: SectionRailProps) {
+export function SectionRail({ title, products, loading, onSeeAll, onProductPress, gradientTitle, compact }: SectionRailProps) {
   const { theme } = useTheme();
+  const cardW = compact ? 120 : 140;
   if (!loading && !products?.length) return null;
 
   return (
@@ -57,12 +60,12 @@ export function SectionRail({ title, products, loading, onSeeAll, onProductPress
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 2 }}>
         {loading || !products
           ? Array.from({ length: 4 }).map((_, i) => (
-              <View key={i} style={{ width: 140 }}>
+              <View key={i} style={{ width: cardW }}>
                 <SkelCard />
               </View>
             ))
           : products.map((p) => (
-              <View key={p.id} style={{ width: 140 }}>
+              <View key={p.id} style={{ width: cardW, flexGrow: 1 }}>
                 <ProductCard p={p} onPress={onProductPress} />
               </View>
             ))}
