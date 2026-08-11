@@ -189,7 +189,9 @@ export function useHomeSections() {
 }
 
 /* ── Homepage builder config (mirror useHomepageConfig) ── */
-export const DEFAULT_HOMEPAGE_SECTIONS = [
+export type HomeSectionItem = string | { key: string; ad_strip_id: string | null };
+
+export const DEFAULT_HOMEPAGE_SECTIONS: HomeSectionItem[] = [
   'hero',
   'flash_sale',
   'today_deals',
@@ -206,15 +208,16 @@ export const DEFAULT_HOMEPAGE_SECTIONS = [
 ];
 
 export function useHomepageConfig() {
-  const [sections, setSections] = useState<string[]>(DEFAULT_HOMEPAGE_SECTIONS);
+  const [sections, setSections] = useState<HomeSectionItem[]>(DEFAULT_HOMEPAGE_SECTIONS);
   const fetch = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('homepage_sections')
-        .select('section_key,enabled,sort_order')
+        .select('section_key,enabled,sort_order,ad_strip_id')
         .eq('enabled', true)
         .order('sort_order');
-      if (!error && data && data.length) setSections(data.map((s) => s.section_key));
+      if (!error && data && data.length)
+        setSections(data.map((s) => ({ key: s.section_key, ad_strip_id: s.ad_strip_id || null })));
       else setSections(DEFAULT_HOMEPAGE_SECTIONS);
     } catch {
       setSections(DEFAULT_HOMEPAGE_SECTIONS);

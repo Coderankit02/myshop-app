@@ -209,22 +209,23 @@ export default function HomeScreen() {
     ));
   }, [cats, sectionProds, sectionProdsReady]);
 
-  // Final ordered sections (mirror homepage builder config) + ad strips beech me
+  // Final ordered sections (mirror homepage builder config). Ad strips bhi ab
+  // Section Order ke andar hi hain (section_key='ad_strip' + ad_strip_id) —
+  // admin Section Order list me drag karke position change hoti hai.
   const rendered = useMemo(() => {
     const out: React.ReactNode[] = [];
-    homepageSections.forEach((key, i) => {
+    homepageSections.forEach((sec) => {
+      const key = typeof sec === 'string' ? sec : sec.key;
+      if (key === 'ad_strip') {
+        const strip = adStrips.find((s) => s.id === (typeof sec === 'object' ? sec.ad_strip_id : null));
+        if (strip) out.push(<AdStripSection key={`ad-${strip.id}`} strip={strip} onAdClick={onAdClick} />);
+        return;
+      }
       const node = key === 'category_sections' ? categorySections : sectionsMap[key] || null;
       if (!node) return;
       const items = Array.isArray(node) ? node : [node];
       items.forEach((item, idx) => out.push(<View key={`${key}-${idx}`}>{item}</View>));
-      const pos = i + 1;
-      adStrips
-        .filter((s) => s.position === pos)
-        .forEach((s) => out.push(<AdStripSection key={`ad-${s.id}`} strip={s} onAdClick={onAdClick} />));
     });
-    adStrips
-      .filter((s) => s.position > homepageSections.length)
-      .forEach((s) => out.push(<AdStripSection key={`ad-${s.id}`} strip={s} onAdClick={onAdClick} />));
     return out;
   }, [homepageSections, categorySections, sectionsMap, adStrips, onAdClick]);
 
@@ -334,7 +335,7 @@ function AdStripSection({ strip, onAdClick }: { strip: AdStrip; onAdClick: (img:
               { flexGrow: 1, flexBasis: 0, minWidth: 0, borderRadius: 14, overflow: 'hidden', borderWidth: 1.5, backgroundColor: theme.light, transform: [{ scale: pressed ? 0.97 : 1 }] },
               { borderColor: theme.border },
             ]}>
-            <Image source={{ uri: img.image_url }} style={{ width: '100%', height: 160 }} resizeMode="cover" />
+            <Image source={{ uri: img.image_url }} style={{ width: '100%', height: 128 }} resizeMode="cover" />
           </Pressable>
         ))}
       </View>
@@ -355,7 +356,7 @@ function AdStripSection({ strip, onAdClick }: { strip: AdStrip; onAdClick: (img:
           key={img.id}
           onPress={() => onAdClick(img)}
           style={({ pressed }) => [
-            { width: vw || '100%', height: Math.round((vw || 360) * 0.4), backgroundColor: theme.light, transform: [{ scale: pressed ? 0.97 : 1 }] },
+            { width: vw || '100%', height: Math.round((vw || 360) * 0.26), backgroundColor: theme.light, transform: [{ scale: pressed ? 0.97 : 1 }] },
           ]}>
           <Image source={{ uri: img.image_url }} style={styles.adImage} resizeMode="cover" />
         </Pressable>
