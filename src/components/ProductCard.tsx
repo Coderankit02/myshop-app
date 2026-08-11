@@ -185,7 +185,9 @@ const styles = StyleSheet.create({
   imgWrap: { position: 'relative', aspectRatio: 1 },
   img: { width: '100%', height: '100%' },
   imgFallback: { alignItems: 'center', justifyContent: 'center' },
-  name: { height: 38, lineHeight: 19 },
+  // 2-line naam box: bodyBold lineHeight 20 × 2 = 40px + 2px breathing room.
+  // Pehle 38px tha — second line clip ho rahi thi (screenshot me confirmed).
+  name: { height: 42, lineHeight: 20 },
   badge: {
     position: 'absolute',
     top: 8,

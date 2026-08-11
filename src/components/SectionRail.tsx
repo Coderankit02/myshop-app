@@ -24,10 +24,14 @@ export function SectionRail({ title, products, loading, onSeeAll, onProductPress
   const { theme } = useTheme();
   const cardW = compact ? 120 : 140;
   if (!loading && !products?.length) return null;
+  // Empty title (flash sale ke andar) par headRow NAHI dikhana — warna timer aur
+  // cards ke bich ~35px khali gap ban jaata hai (screenshot me confirmed).
+  const hasHeader = !!(title && title.trim()) || !!onSeeAll || !!gradientTitle;
 
   return (
     <View>
-      <View style={styles.headRow}>
+      {hasHeader && (
+        <View style={styles.headRow}>
         {gradientTitle ? (
           <View
             style={[
@@ -56,7 +60,8 @@ export function SectionRail({ title, products, loading, onSeeAll, onProductPress
             </AppText>
           </Pressable>
         )}
-      </View>
+        </View>
+      )}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 2 }}>
         {loading || !products
           ? Array.from({ length: 4 }).map((_, i) => (

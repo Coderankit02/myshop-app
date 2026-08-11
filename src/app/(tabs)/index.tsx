@@ -170,7 +170,7 @@ export default function HomeScreen() {
             </View>
             <CountdownTimer compact />
           </View>
-          <View style={{ marginTop: 10 }}>
+          <View style={{ marginTop: 6 }}>
             <SectionRail title="" products={homeSections.flash} loading={homeLoading} onProductPress={goProduct} compact />
           </View>
         </View>
@@ -865,7 +865,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 13, fontFamily: 'Poppins_400Regular', padding: 0, paddingVertical: 0 },
   announce: { marginHorizontal: 16, marginTop: 12, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
-  flashCard: { borderRadius: 20, padding: 14 },
+  flashCard: { borderRadius: 20, padding: 12 },
   flashHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
   featsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 14 },
   featCard: { width: '48%', flexGrow: 1, borderRadius: 16, borderWidth: 1, padding: 14 },
