@@ -2,14 +2,10 @@
  * Home — port of the website's homepage (homepage_sections order respected).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
 import { supabase } from '@/lib/supabase';
-import { calculateDelivery, loadDeliveryConfig, reverseGeocode } from '@/lib/delivery';
-import type { DeliveryInfo } from '@/lib/types';
 import { useTheme } from '@/context/ThemeContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useCart } from '@/context/CartContext';
@@ -245,9 +241,9 @@ export default function HomeScreen() {
             <AppText variant="heading" color={theme.dark} numberOfLines={1}>
               {settings.shop_name || 'RK Grocery Mart'}
             </AppText>
-            <View style={{ marginTop: 2 }}>
-              <LocationPill />
-            </View>
+            <AppText variant="caption" color={theme.primary} numberOfLines={1} style={{ marginTop: 2 }}>
+              {settings.footer_text || 'हर घर की पसंद'}
+            </AppText>
           </View>
           <Pressable onPress={() => router.push('/cart')} hitSlop={8} style={[styles.cartBtn, { backgroundColor: theme.primaryLight }]}>
             <AppText style={{ fontSize: 20 }}>🛒</AppText>
@@ -392,251 +388,6 @@ function AdStripSection({ strip, onAdClick }: { strip: AdStrip; onAdClick: (img:
         </Pressable>
       ))}
     </ScrollView>
-  );
-}
-
-/* ── Location Pill + Modal (site ke header "Apna Delivery Location" jaisa) ── */
-const LOCATION_STORAGE_KEY = 'rk_header_location';
-
-interface SavedLocation {
-  city: string;
-  pincode: string;
-  mode: 'gps' | 'manual';
-  distanceKm: number | null;
-  charge: number | null;
-  available: boolean | null;
-  lat: number | null;
-  lng: number | null;
-  ts: number;
-}
-
-function LocationPill() {
-  const { theme } = useTheme();
-  const [saved, setSaved] = useState<SavedLocation | null>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(LOCATION_STORAGE_KEY);
-        if (raw) {
-          const p = JSON.parse(raw);
-          if (p && p.city) setSaved(p);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, []);
-
-  const onConfirm = async (loc: SavedLocation) => {
-    setSaved(loc);
-    try {
-      await AsyncStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(loc));
-    } catch {
-      // ignore
-    }
-    setOpen(false);
-  };
-
-  const label = saved?.city || 'Apna Location Set Karein';
-
-  return (
-    <>
-      <Pressable
-        onPress={() => setOpen(true)}
-        hitSlop={6}
-        style={({ pressed }) => [
-          styles.locPill,
-          { backgroundColor: theme.primaryLight, borderColor: theme.border, opacity: pressed ? 0.85 : 1 },
-        ]}>
-        <AppText style={{ fontSize: 13 }}>📍</AppText>
-        <AppText variant="captionBold" color={theme.primaryDark} numberOfLines={1} style={{ flexShrink: 1 }}>
-          {label}
-        </AppText>
-        <AppText variant="tiny" color={theme.gray}>
-          ▾
-        </AppText>
-      </Pressable>
-      <LocationModal open={open} onClose={() => setOpen(false)} current={saved} onConfirm={onConfirm} />
-    </>
-  );
-}
-
-function LocationModal({
-  open,
-  onClose,
-  current,
-  onConfirm,
-}: {
-  open: boolean;
-  onClose: () => void;
-  current: SavedLocation | null;
-  onConfirm: (loc: SavedLocation) => void;
-}) {
-  const { theme } = useTheme();
-  const [step, setStep] = useState<'idle' | 'detecting' | 'detected' | 'error'>('idle');
-  const [error, setError] = useState('');
-  const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
-  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
-  const [city, setCity] = useState(current?.city || '');
-  const [pincode, setPincode] = useState(current?.pincode || '');
-
-  useEffect(() => {
-    if (!open) return;
-    setStep('idle');
-    setError('');
-    setDeliveryInfo(null);
-    setGeo(null);
-    setCity(current?.city || '');
-    setPincode(current?.pincode || '');
-  }, [open, current]);
-
-  const handleDetect = async () => {
-    setStep('detecting');
-    setError('');
-    try {
-      await loadDeliveryConfig();
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setStep('error');
-        setError('Location permission nahi mili. Neeche manual entry use karein.');
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const info = calculateDelivery(pos.coords.latitude, pos.coords.longitude);
-      setDeliveryInfo(info);
-      setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-      if (addr?.city) setCity(addr.city);
-      if (addr?.pincode) setPincode(addr.pincode);
-      setStep('detected');
-    } catch {
-      setStep('error');
-      setError('Location detect nahi ho payi. Manual entry use karein.');
-    }
-  };
-
-  const pinValid = /^\d{6}$/.test(pincode.trim());
-  const canConfirm = city.trim().length > 0 && pinValid;
-
-  const handleConfirm = () => {
-    if (!canConfirm) {
-      setError('City aur 6-digit pincode zaroori hai.');
-      return;
-    }
-    onConfirm({
-      city: city.trim(),
-      pincode: pincode.trim(),
-      mode: geo ? 'gps' : 'manual',
-      distanceKm: deliveryInfo?.distanceKm ?? null,
-      charge: deliveryInfo?.charge ?? null,
-      available: deliveryInfo?.available ?? null,
-      lat: geo?.lat ?? null,
-      lng: geo?.lng ?? null,
-      ts: Date.now(),
-    });
-  };
-
-  const statusBg = deliveryInfo
-    ? !deliveryInfo.available
-      ? theme.tintRed.bg
-      : deliveryInfo.charge === 0
-      ? theme.tintGreen.bg
-      : theme.tintBlue.bg
-    : theme.light;
-  const statusText = deliveryInfo
-    ? !deliveryInfo.available
-      ? theme.tintRed.text
-      : deliveryInfo.charge === 0
-      ? theme.tintGreen.text
-      : theme.tintBlue.text
-    : theme.gray;
-
-  return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.locSheet, { backgroundColor: theme.cardBg }]}>
-          <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
-          <View style={styles.sheetHead}>
-            <AppText variant="title" style={{ flex: 1 }}>
-              📍 Apna Delivery Location
-            </AppText>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <AppText variant="bodyBold" style={{ fontSize: 18 }}>
-                ✕
-              </AppText>
-            </Pressable>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-            <Pressable
-              onPress={handleDetect}
-              disabled={step === 'detecting'}
-              style={[styles.locDetectBtn, { backgroundColor: theme.primary }]}>
-              <AppText variant="bodyBold" color="#fff">
-                {step === 'detecting' ? '⏳ Detect ho rahi hai…' : '📡 GPS Se Location Detect Karo'}
-              </AppText>
-            </Pressable>
-
-            {deliveryInfo && (
-              <View style={[styles.locStatusCard, { backgroundColor: statusBg, borderColor: theme.border }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <AppText style={{ fontSize: 22 }}>{deliveryInfo.emoji}</AppText>
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="bodyBold" style={{ color: statusText }}>
-                      {deliveryInfo.label}
-                    </AppText>
-                    <AppText variant="caption" style={{ color: statusText }}>
-                      {deliveryInfo.available
-                        ? `Distance ~${Math.round(deliveryInfo.distanceKm)} km • ${deliveryInfo.charge === 0 ? 'FREE Delivery' : `Charge ₹${deliveryInfo.charge}`}`
-                        : 'Is area mein delivery available nahi.'}
-                    </AppText>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            <AppText variant="bodyBold" color={theme.gray} style={{ marginTop: 16, marginBottom: 8 }}>
-              Ya phir manual daalein:
-            </AppText>
-            <TextInput
-              value={city}
-              onChangeText={setCity}
-              placeholder="City (e.g. Jaunpur)"
-              placeholderTextColor={theme.muted}
-              style={[styles.locInput, { backgroundColor: theme.light, borderColor: theme.border, color: theme.dark }]}
-            />
-            <TextInput
-              value={pincode}
-              onChangeText={(t) => setPincode(t.replace(/\D/g, '').slice(0, 6))}
-              placeholder="6-digit Pincode"
-              placeholderTextColor={theme.muted}
-              keyboardType="number-pad"
-              maxLength={6}
-              style={[styles.locInput, { backgroundColor: theme.light, borderColor: theme.border, color: theme.dark, marginTop: 8 }]}
-            />
-
-            {error ? (
-              <AppText variant="caption" color={theme.red} style={{ marginTop: 8 }}>
-                ⚠️ {error}
-              </AppText>
-            ) : null}
-
-            <PrimaryButton
-              title="✅ Location Confirm Karein"
-              onPress={handleConfirm}
-              disabled={!canConfirm}
-              style={{ marginTop: 16 }}
-            />
-            <AppText variant="caption" color={theme.muted} center style={{ marginTop: 10 }}>
-              Delivery availability, charge aur ETA is location ke hisaab se checkout par milega.
-            </AppText>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -886,36 +637,4 @@ const styles = StyleSheet.create({
   howCard: { borderRadius: 16, padding: 18 },
   adImageCard: { width: 212, height: 120, borderRadius: 16, borderWidth: 1.5, overflow: 'hidden' },
   adImage: { width: '100%', height: '100%' },
-  locPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
-  },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  locSheet: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 24,
-    maxHeight: '80%',
-  },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  locDetectBtn: { borderRadius: 14, paddingVertical: 13, alignItems: 'center' },
-  locStatusCard: { borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 12 },
-  locInput: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 13,
-    fontFamily: 'Poppins_400Regular',
-  },
 });

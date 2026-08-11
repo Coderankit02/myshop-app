@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.rinkukiranastore.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#15803D",
         "foregroundImage": "./assets/images/adaptive-icon.png"

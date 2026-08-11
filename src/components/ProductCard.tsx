@@ -185,9 +185,10 @@ const styles = StyleSheet.create({
   imgWrap: { position: 'relative', aspectRatio: 1 },
   img: { width: '100%', height: '100%' },
   imgFallback: { alignItems: 'center', justifyContent: 'center' },
-  // 2-line naam box: bodyBold lineHeight 20 × 2 = 40px + 2px breathing room.
-  // Pehle 38px tha — second line clip ho rahi thi (screenshot me confirmed).
-  name: { height: 42, lineHeight: 20 },
+  // 2-line naam box — Android par Poppins 13px actual line ~21px nikalta hai,
+  // isliye pehle (13px/lh20/h42) second line clip hoti thi. Ab text chhota
+  // (12px) + box bada (44px): 2 lines ≈ 36px, 8px slack — kabhi nahi katega.
+  name: { height: 44, lineHeight: 18, fontSize: 12 },
   badge: {
     position: 'absolute',
     top: 8,
