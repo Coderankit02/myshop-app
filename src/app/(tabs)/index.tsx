@@ -19,7 +19,7 @@ import { CountdownTimer } from '@/components/CountdownTimer';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { calcDiscount } from '@/lib/helpers';
 import type { EnrichedProduct } from '@/hooks/useData';
-import type { Banner, Product } from '@/lib/types';
+import type { Banner, Category, Product } from '@/lib/types';
 
 export default function HomeScreen() {
   const { theme } = useTheme();
@@ -193,32 +193,56 @@ export default function HomeScreen() {
     [banners, bannersLoading, cats, catsLoading, homeSections, homeLoading, featuredProds, featLoading, reviews, theme]
   );
 
-  // category_sections rails (all categories, all products)
-  const categorySections = useMemo(() => {
-    return cats.map((c) => (
-      <View key={c.id} style={{ marginTop: 18 }}>
-        <SectionRail
-          title={c.name}
-          products={sectionProdsReady ? sectionProds[c.id] : undefined}
-          loading={!sectionProdsReady}
-          onSeeAll={() => goCategory(c.id)}
-          onProductPress={goProduct}
-          gradientTitle
-        />
-      </View>
-    ));
-  }, [cats, sectionProds, sectionProdsReady]);
+  // Category Sections: har category ka apna Section Order row hota hai (admin
+  // drag karke kahin bhi rakh sakta hai — ad strips categories ke beech bhi).
+  // ownCatIds = jinke apne row hain (hidden wale bhi — taaki hidden category
+  // aggregate fallback mein dobara na dikhe). Aggregate fallback sirf un
+  // categories ko dikhata hai jinka apna row NAHI hai.
+  const ownCatIds = useMemo(
+    () =>
+      new Set(
+        homepageSections
+          .filter((s): s is { key: string; ad_strip_id: string | null; category_id: string; enabled: boolean } =>
+            typeof s === 'object' && s.key === 'category_sections' && !!s.category_id
+          )
+          .map((s) => s.category_id)
+      ),
+    [homepageSections]
+  );
+  const catRail = (c: Category) => (
+    <View key={c.id} style={{ marginTop: 18 }}>
+      <SectionRail
+        title={c.name}
+        products={sectionProdsReady ? sectionProds[c.id] : undefined}
+        loading={!sectionProdsReady}
+        onSeeAll={() => goCategory(c.id)}
+        onProductPress={goProduct}
+        gradientTitle
+      />
+    </View>
+  );
+  const categorySections = useMemo(() => cats.filter((c) => !ownCatIds.has(c.id)).map(catRail), [cats, ownCatIds, sectionProds, sectionProdsReady]);
 
   // Final ordered sections (mirror homepage builder config). Ad strips bhi ab
-  // Section Order ke andar hi hain (section_key='ad_strip' + ad_strip_id) —
-  // admin Section Order list me drag karke position change hoti hai.
+  // Section Order ke andar hi hain (section_key='ad_strip' + ad_strip_id) aur
+  // HAR CATEGORY ka apna section row hota hai — admin drag karke kahin bhi
+  // rakh sakta hai (ad strips categories ke beech bhi).
   const rendered = useMemo(() => {
     const out: React.ReactNode[] = [];
-    homepageSections.forEach((sec) => {
+    // Hook ab saare rows (enabled + disabled) deta hai — sirf enabled render karo
+    homepageSections
+      .filter((s) => typeof s === 'string' || s.enabled !== false)
+      .forEach((sec) => {
       const key = typeof sec === 'string' ? sec : sec.key;
       if (key === 'ad_strip') {
         const strip = adStrips.find((s) => s.id === (typeof sec === 'object' ? sec.ad_strip_id : null));
         if (strip) out.push(<AdStripSection key={`ad-${strip.id}`} strip={strip} onAdClick={onAdClick} />);
+        return;
+      }
+      // Per-category section: sirf us category ka rail
+      if (key === 'category_sections' && typeof sec === 'object' && sec.category_id) {
+        const c = cats.find((x) => x.id === sec.category_id);
+        if (c) out.push(<View key={`cat-${c.id}`}>{catRail(c)}</View>);
         return;
       }
       const node = key === 'category_sections' ? categorySections : sectionsMap[key] || null;
@@ -227,7 +251,7 @@ export default function HomeScreen() {
       items.forEach((item, idx) => out.push(<View key={`${key}-${idx}`}>{item}</View>));
     });
     return out;
-  }, [homepageSections, categorySections, sectionsMap, adStrips, onAdClick]);
+  }, [homepageSections, categorySections, sectionsMap, cats, adStrips, onAdClick]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.pageBg }}>

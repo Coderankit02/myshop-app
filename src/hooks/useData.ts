@@ -205,7 +205,9 @@ export function useHomeSections() {
 }
 
 /* ── Homepage builder config (mirror useHomepageConfig) ── */
-export type HomeSectionItem = string | { key: string; ad_strip_id: string | null };
+export type HomeSectionItem =
+  | string
+  | { key: string; ad_strip_id: string | null; category_id: string | null; enabled: boolean };
 
 export const DEFAULT_HOMEPAGE_SECTIONS: HomeSectionItem[] = [
   'hero',
@@ -227,13 +229,21 @@ export function useHomepageConfig() {
   const [sections, setSections] = useState<HomeSectionItem[]>(DEFAULT_HOMEPAGE_SECTIONS);
   const fetch = useCallback(async () => {
     try {
+      // Saare rows (enabled + disabled) — aggregate fallback ko pata ho ki kis
+      // category ka apna row hai. Rendering index.tsx me enabled filter karta hai.
       const { data, error } = await supabase
         .from('homepage_sections')
-        .select('section_key,enabled,sort_order,ad_strip_id')
-        .eq('enabled', true)
+        .select('section_key,enabled,sort_order,ad_strip_id,category_id')
         .order('sort_order');
       if (!error && data && data.length)
-        setSections(data.map((s) => ({ key: s.section_key, ad_strip_id: s.ad_strip_id || null })));
+        setSections(
+          data.map((s) => ({
+            key: s.section_key,
+            ad_strip_id: s.ad_strip_id || null,
+            category_id: s.category_id || null,
+            enabled: s.enabled !== false,
+          }))
+        );
       else setSections(DEFAULT_HOMEPAGE_SECTIONS);
     } catch {
       setSections(DEFAULT_HOMEPAGE_SECTIONS);
